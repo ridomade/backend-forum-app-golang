@@ -1,1 +1,25 @@
+# Binary & Build Files
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+*.out
+*.test
+
+# Build artifacts
+/tmp/
+
+# Environment Files
 .env
+
+# Editor & OS files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+ehthumbs.db
+
+# Air live reload config (opsional, bisa di-commit jika ingin dibagikan)
+.air.toml
