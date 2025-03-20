@@ -10,14 +10,14 @@ import (
 
 
 func AccountRoutes() {
-	http.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/forum/register", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			controllers.CreateAccount(w, r)
 		} else {
 			http.Error(w, "Metode tidak didukung", http.StatusMethodNotAllowed)
 		}
 	})
-	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/forum/login", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			controllers.LoginAccount(w, r)
 		} else {
@@ -28,7 +28,7 @@ func AccountRoutes() {
 
 func PostRoutes() {
 	// GET request tidak perlu middleware
-	http.HandleFunc("/posts", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/forum/posts", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			controllers.GetPosts(w, r)
 			return
