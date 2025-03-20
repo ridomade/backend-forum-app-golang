@@ -25,9 +25,10 @@ func ConnectDB (){
 	dbPass := os.Getenv("DB_PASS")
 	dbHost := os.Getenv("DB_HOST")
 	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
 
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/first_go", dbUser, dbPass, dbHost, dbPort)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUser, dbPass, dbHost, dbPort, dbName)
 	
 
 	DB, err = sql.Open("mysql", dsn)
