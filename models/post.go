@@ -6,4 +6,6 @@ type Post struct {
 	Account_id int `json:"account_id"`
 	Title string `json:"title"`
 	Content string `json:"content"`
+	Created_at string `json:"created_at"`
+	Update_at string `json:"update_at"`
 }

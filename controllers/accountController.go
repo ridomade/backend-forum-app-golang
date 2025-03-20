@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -19,6 +20,8 @@ import (
 // Creating New Account
 func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	var account models.Account
+	
+
 	
 	// Decode JSON from request body
 	err := json.NewDecoder(r.Body).Decode(&account)
@@ -32,6 +35,39 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	// Check if email and password is empty
+	if account.Email == "" || account.Password == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Email and Password cannot be empty",
+		})
+		return
+	}
+	
+	// Validate email format
+	emailRegex := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+	re := regexp.MustCompile(emailRegex)
+
+	if !re.MatchString(account.Email) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Invalid email format",
+		})
+		return
+	}
+
+	// Validate password length
+	if len(account.Password) < 8 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Password must be at least 8 characters long",
+		})
+		return
+	}
+
 	// Check if email already registered
 	var existingEmail string
 	queryCheck := "SELECT email FROM accounts WHERE email = ?"
@@ -102,6 +138,16 @@ func LoginAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if email and password is empty
+	if account.Email == "" || account.Password == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Email and Password cannot be empty",
+		})
+		return
+	}
+	
 	// Get account data from database
 	query := "SELECT id, password FROM accounts WHERE email = ?"
 	err = config.DB.QueryRow(query, account.Email).Scan(&account.ID, &storedPasswordHash)
@@ -138,10 +184,12 @@ func LoginAccount(w http.ResponseWriter, r *http.Request) {
 
 	// Create JWT Token
 	expirationTime := time.Now().Add(24 * time.Hour) 
-	claims := &jwt.RegisteredClaims{
-		Subject:   account.Email,
-		ExpiresAt: jwt.NewNumericDate(expirationTime),
+	claims := jwt.MapClaims{
+		"email": account.Email,
+		"id":    account.ID,
+		"exp":   expirationTime.Unix(),
 	}
+	
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(jwtKey)
 	if err != nil {

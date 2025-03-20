@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -22,6 +23,11 @@ func init() {
 	jwtKey = []byte(os.Getenv("JWT_SECRET")) 
 }
 
+// Define a custom type for context keys
+type contextKey string
+
+const ClaimsKey contextKey = "claims"
+
 // Middleware for checking JWT Token
 func JWTMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,12 +45,13 @@ func JWTMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		claims := &jwt.RegisteredClaims{}
+		claims := jwt.MapClaims{}
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 			return jwtKey, nil
 		})
 
-		fmt.Println("Token: ", token)
+		// fmt.Println("Token: ", token)
+		// fmt.Println("Claims: ", claims)
 
 		if err != nil || !token.Valid {
 			fmt.Println("Invalid Token!")
@@ -52,6 +59,7 @@ func JWTMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		ctx := context.WithValue(r.Context(), ClaimsKey, claims)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
