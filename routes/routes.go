@@ -14,21 +14,21 @@ func AccountRoutes() {
 		if r.Method == http.MethodPost {
 			controllers.CreateAccount(w, r)
 		} else {
-			http.Error(w, "Metode tidak didukung", http.StatusMethodNotAllowed)
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
 	})
 	http.HandleFunc("/forum/login", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			controllers.LoginAccount(w, r)
 		} else {
-			http.Error(w, "Metode tidak didukung", http.StatusMethodNotAllowed)
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
 	})
 }
 
 func PostRoutes() {
 	// GET request tidak perlu middleware
-	http.HandleFunc("/forum/posts", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/forum/post", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			controllers.GetPosts(w, r)
 			return
@@ -37,6 +37,27 @@ func PostRoutes() {
 		// Jika bukan GET, periksa apakah method adalah POST
 		if r.Method == http.MethodPost {
 			middleware.JWTMiddleware(http.HandlerFunc(controllers.CreatePost)).ServeHTTP(w, r)
+			return
+		}
+
+		// Jika method bukan GET atau POST
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Method Not Allowed",
+		})
+	})
+	http.HandleFunc("/forum/post/reply", func(w http.ResponseWriter, r *http.Request) {
+	
+
+		if r.Method == http.MethodGet {
+			controllers.GetPostReplies(w, r)
+			return
+		}
+
+		// Jika bukan GET, periksa apakah method adalah POST
+		if r.Method == http.MethodPost {
+			middleware.JWTMiddleware(http.HandlerFunc(controllers.CreatePostReply)).ServeHTTP(w, r)
 			return
 		}
 

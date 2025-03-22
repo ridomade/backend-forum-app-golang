@@ -1,11 +1,10 @@
 package models
 
 // Item merepresentasikan tabel items di database
-type Post struct {
+type PostReply struct {
 	ID   int    `json:"id"`
 	Account_id int `json:"account_id"`
+	PostParent int `json:"post_parent"`
 	Author string `json:"author"`
 	Content string `json:"content"`
-	Created_at string `json:"created_at,omitempty"`
-	Update_at  string `json:"update_at,omitempty"`
 }
