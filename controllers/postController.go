@@ -6,28 +6,34 @@ import (
 	"firstproject/middleware"
 	"firstproject/models"
 	"fmt"
+	"math"
 	"net/http"
+	"strconv"
 
 	"github.com/golang-jwt/jwt/v4"
 )
 
 // CreatePost function to create a new post
-func CreatePost(w http.ResponseWriter, r *http.Request) { 
+func CreatePost(w http.ResponseWriter, r *http.Request) {
 	var post models.Post
 
 	// Decode JSON from body request
 	err := json.NewDecoder(r.Body).Decode(&post)
 	if err != nil {
-		http.Error(w, `{"message": "Gagal membaca data dari request"}`, http.StatusBadRequest)
-		return
-	}
-
-	// Check if author and content is empty
-	if post.Author == "" || post.Content == "" {
+		// Check if author and content is empty
+		if post.Author == "" || post.Content == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "author and content cannot be empty",
+			})
+			return
+		}
+		fmt.Println("Error Reading Data from Request :", err)
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "author and content cannot be empty",
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Error Reading Data from Request",
 		})
 		return
 	}
@@ -75,16 +81,20 @@ func CreatePostReply(w http.ResponseWriter, r *http.Request) {
 	// Decode JSON from request body
 	err := json.NewDecoder(r.Body).Decode(&postReply)
 	if err != nil {
-		http.Error(w, `{"message": "Error Ready data From the Request"}`, http.StatusBadRequest)
-		return
-	}
-
-	// Check if author and content and post_parent is empty
-	if postReply.Author == "" || postReply.Content == "" || postReply.PostParent == 0 {
+		// Check if author and content and post_parent is empty
+		if postReply.Author == "" || postReply.Content == "" || postReply.PostParent == 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "author, post_parent, and content cannot be empty",
+			})
+			return
+		}
+		fmt.Println("Error Reading Data from Request :", err)
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "author, post_parent, and content cannot be empty",
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Error Reading Data from Request",
 		})
 		return
 	}
@@ -127,71 +137,76 @@ func CreatePostReply(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func GetPostReplies(w http.ResponseWriter, r *http.Request) {
-	var postReplies []models.PostReply
+func GetPostsWithReplies(w http.ResponseWriter, r *http.Request) {
+	pageStr := r.URL.Query().Get("page")
+	limitStr := r.URL.Query().Get("limit")
 
-	// Get data from database
-	rows, err := config.DB.Query("SELECT * FROM post_reply WHERE post_parent = ?", r.URL.Query().Get("post_parent"))
+	page := 1
+	limit := 5
+
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	offset := (page - 1) * limit
+
+	// Dapatkan total jumlah post
+	var totalPosts int
+	err := config.DB.QueryRow("SELECT COUNT(*) FROM posts").Scan(&totalPosts)
 	if err != nil {
-		fmt.Println("Error Querying Data : \n",err)
-		http.Error(w, `{"message": "Error getting the data"}`, http.StatusInternalServerError)
+		http.Error(w, `{"message": "Failed to get total post count"}`, http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
 
-	// Iterate over rows
-	for rows.Next() {
-		var postReply models.PostReply
-		err := rows.Scan(&postReply.ID, &postReply.Account_id, &postReply.PostParent, &postReply.Author, &postReply.Content)
-		if err != nil {
-			fmt.Println("Error Querying Data : \n",err)
-			http.Error(w, `{"message": "Error getting the data"}`, http.StatusInternalServerError)
-			return
-		}
-		postReplies = append(postReplies, postReply)
+	// Hitung total halaman
+	totalPages := int(math.Ceil(float64(totalPosts) / float64(limit)))
+
+	// Ambil data post
+	query := "SELECT * FROM posts ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	postRows, err := config.DB.Query(query, limit, offset)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to fetch posts"}`, http.StatusInternalServerError)
+		return
 	}
+	defer postRows.Close()
 
-	// Send response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK) // Status 200 OK
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "Success",
-		"post_replies": postReplies,
-	})
-
-}
-
-
-// GetPosts function to get all posts
-func GetPosts(w http.ResponseWriter, r *http.Request) {
 	var posts []models.Post
 
-	// Get data from database
-	rows, err := config.DB.Query("SELECT * FROM posts")
-	if err != nil {
-		fmt.Println("Error Querying Data : \n",err)
-		http.Error(w, `{"message": "Gagal mengambil data"}`, http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	// Iterate over rows
-	for rows.Next() {
+	for postRows.Next() {
 		var post models.Post
-		err := rows.Scan(&post.ID, &post.Account_id, &post.Author, &post.Content , &post.Created_at, &post.Update_at)
+		err := postRows.Scan(&post.ID, &post.Account_id, &post.Author, &post.Content, &post.Created_at, &post.Update_at)
 		if err != nil {
-			fmt.Println("Error Querying Data : \n",err)
-			http.Error(w, `{"message": "Gagal mengambil data"}`, http.StatusInternalServerError)
-			return
+			continue
 		}
+
+		var replies []models.PostReply
+		replyRows, _ := config.DB.Query("SELECT * FROM post_reply WHERE post_parent = ?", post.ID)
+		for replyRows.Next() {
+			var reply models.PostReply
+			_ = replyRows.Scan(&reply.ID, &reply.Account_id, &reply.PostParent, &reply.Author, &reply.Content)
+			replies = append(replies, reply)
+		}
+		replyRows.Close()
+
+		post.Replies = replies
 		posts = append(posts, post)
 	}
 
-	// Send response
+	// Kirim response dengan pagination info
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK) // Status 200 OK
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "Success",
-		"posts":   posts,
+		"message":    "Success",
+		"page":       page,
+		"limit":      limit,
+		"totalPosts": totalPosts,
+		"totalPages": totalPages,
+		"posts":      posts,
 	})
 }

@@ -9,19 +9,25 @@ import (
 	"firstproject/routes"
 )
 
+
+
 func main() {
 	// Connect to database
 	config.ConnectDB()
 
-	// Routes
-	routes.PostRoutes()
-	routes.AccountRoutes()
+	// Mux Router
+	mux := http.NewServeMux()
 
-	var port = "8080"
+	// Register Routes
+	routes.PostRoutes(mux)
+	routes.AccountRoutes(mux)
 
-	// Listen and serve
+	port := "8080"
+
+	// Wrap dengan CORS middleware
+	handler := config.EnableCORS(mux)
+
+	// Start server
 	fmt.Println("Server Running on Port:", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
-
-	
+	log.Fatal(http.ListenAndServe(":"+port, handler))
 }

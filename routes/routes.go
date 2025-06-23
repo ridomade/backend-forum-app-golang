@@ -8,16 +8,17 @@ import (
 	"firstproject/middleware"
 )
 
-
-func AccountRoutes() {
-	http.HandleFunc("/forum/register", func(w http.ResponseWriter, r *http.Request) {
+// Ubah fungsi agar menerima parameter `mux`
+func AccountRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/forum/register", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			controllers.CreateAccount(w, r)
 		} else {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
 	})
-	http.HandleFunc("/forum/login", func(w http.ResponseWriter, r *http.Request) {
+
+	mux.HandleFunc("/forum/login", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			controllers.LoginAccount(w, r)
 		} else {
@@ -26,11 +27,12 @@ func AccountRoutes() {
 	})
 }
 
-func PostRoutes() {
+func PostRoutes(mux *http.ServeMux) {
+
 	// GET request tidak perlu middleware
-	http.HandleFunc("/forum/post", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/forum/post", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
-			controllers.GetPosts(w, r)
+			controllers.GetPostsWithReplies(w, r)
 			return
 		}
 
@@ -47,15 +49,9 @@ func PostRoutes() {
 			"message": "Method Not Allowed",
 		})
 	})
-	http.HandleFunc("/forum/post/reply", func(w http.ResponseWriter, r *http.Request) {
-	
 
-		if r.Method == http.MethodGet {
-			controllers.GetPostReplies(w, r)
-			return
-		}
+	mux.HandleFunc("/forum/post/reply", func(w http.ResponseWriter, r *http.Request) {
 
-		// Jika bukan GET, periksa apakah method adalah POST
 		if r.Method == http.MethodPost {
 			middleware.JWTMiddleware(http.HandlerFunc(controllers.CreatePostReply)).ServeHTTP(w, r)
 			return
@@ -69,19 +65,3 @@ func PostRoutes() {
 		})
 	})
 }
-
-// func PostRoutes() {
-// 	http.Handle("/posts", middleware.JWTMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		if r.Method == http.MethodPost {
-// 			controllers.CreatePost(w, r)
-// 		} else if (r.Method == http.MethodGet) {
-// 			controllers.GetPosts(w, r)
-// 		} else {
-// 			w.Header().Set("Content-Type", "application/json")
-// 			w.WriteHeader(http.StatusUnauthorized)
-// 			json.NewEncoder(w).Encode(map[string]interface{}{
-// 				"message": "Method Not Allowed",
-// 			})
-// 		}
-// 	})))
-// }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"firstproject/config"
 	"firstproject/models"
+	"firstproject/utils"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,16 +18,39 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// Initialize JWT Key
+var jwtKey []byte
+
+// Load environment variables from .env file
+func init() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	jwtKey = []byte(os.Getenv("JWT_SECRET"))
+}
+
 // Creating New Account
 func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	var account models.Account
-	
 
-	
 	// Decode JSON from request body
 	err := json.NewDecoder(r.Body).Decode(&account)
 	if err != nil {
-		fmt.Println("Error Reading Data from Request : \n", err)
+		// Log the error
+		fmt.Printf("Time Now : %s\n", utils.GetNow())
+		fmt.Println("Error Reading Data from Request :", err)
+		// Check if email and password is empty
+		if account.Email == "" || account.Password == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"message": "email and password cannot be empty",
+			})
+			return
+		}
+		// Send response for error reading request
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -34,22 +58,15 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
-	// Check if email and password is empty
-	if account.Email == "" || account.Password == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"message": "email and password cannot be empty",
-		})
-		return
-	}
-	
+
 	// Validate email format
 	emailRegex := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
 	re := regexp.MustCompile(emailRegex)
 
 	if !re.MatchString(account.Email) {
+		// Log the error
+		fmt.Printf("Time Now : %s\n", utils.GetNow())
+		fmt.Println("Invalid email format!")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -60,6 +77,9 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 
 	// Validate password length
 	if len(account.Password) < 8 {
+		// Log the error
+		fmt.Printf("Time Now : %s\n", utils.GetNow())
+		fmt.Println("Doesn't meet password requirements!")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -73,7 +93,9 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	queryCheck := "SELECT email FROM accounts WHERE email = ?"
 	err = config.DB.QueryRow(queryCheck, account.Email).Scan(&existingEmail)
 	if err == nil {
-		fmt.Printf("Email {%s} Already Registerd!", account.Email)
+		// Log the error
+		fmt.Printf("Time Now : %s\n", utils.GetNow())
+		fmt.Printf("Email {%s} Already Registerd!\n", account.Email)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -89,10 +111,10 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert Data to Database
-	query	:= "INSERT INTO accounts (email,password) VALUES (?, ?)"
+	query := "INSERT INTO accounts (email,password) VALUES (?, ?)"
 	result, err := config.DB.Exec(query, account.Email, hashedPassword)
 	if err != nil {
-		fmt.Println("Error Inserting New Data : \n",err)
+		fmt.Printf("Error Inserting New Data :\n %s\n", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -104,24 +126,18 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	// Get ID from last inserted data
 	id, _ := result.LastInsertId()
 	account.ID = int(id)
+	account.Password = os.DevNull // Clear password from response
 
 	// Send Response
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(account)
+
+	// Log the account creation
+	fmt.Printf("Time Now : %s\n", utils.GetNow())
+	fmt.Printf("Account Created Successfully! :\n%+v", account)
 }
 
-// Initialize JWT Key
-var jwtKey []byte
-func init() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	jwtKey = []byte(os.Getenv("JWT_SECRET")) 
-}
-
-
+// Login Account
 func LoginAccount(w http.ResponseWriter, r *http.Request) {
 	var account models.Account
 	var storedPasswordHash string
@@ -129,7 +145,7 @@ func LoginAccount(w http.ResponseWriter, r *http.Request) {
 	// Decode JSON from request body
 	err := json.NewDecoder(r.Body).Decode(&account)
 	if err != nil {
-		fmt.Println("Error Reading Request : \n",err)
+		fmt.Println("Error Reading Request : \n", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -147,20 +163,20 @@ func LoginAccount(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	// Get account data from database
 	query := "SELECT id, password FROM accounts WHERE email = ?"
 	err = config.DB.QueryRow(query, account.Email).Scan(&account.ID, &storedPasswordHash)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			fmt.Println("Email Not Found! : \n",err)
+			fmt.Println("Email Not Found! : \n", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"message": "Email Not Found!",
 			})
-		} else {	
-			fmt.Println("Error when Trying to Get the Data : \n",err)
+		} else {
+			fmt.Println("Error when Trying to Get the Data : \n", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(map[string]interface{}{
@@ -173,7 +189,7 @@ func LoginAccount(w http.ResponseWriter, r *http.Request) {
 	// Compare password
 	err = bcrypt.CompareHashAndPassword([]byte(storedPasswordHash), []byte(account.Password))
 	if err != nil {
-		fmt.Println("Wrong Passowrd! : \n" ,err)
+		fmt.Println("Wrong Passowrd! : \n", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -183,17 +199,17 @@ func LoginAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create JWT Token
-	expirationTime := time.Now().Add(24 * time.Hour) 
+	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := jwt.MapClaims{
 		"email": account.Email,
 		"id":    account.ID,
 		"exp":   expirationTime.Unix(),
 	}
-	
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(jwtKey)
 	if err != nil {
-		fmt.Println("Error Creating Token : \n",err)
+		fmt.Println("Error Creating Token : \n", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -207,6 +223,6 @@ func LoginAccount(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Login berhasil!",
 		"data":    account,
-		"token":   tokenString,	
+		"token":   tokenString,
 	})
 }

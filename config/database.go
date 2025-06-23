@@ -33,13 +33,12 @@ func ConnectDB (){
 
 	DB, err = sql.Open("mysql", dsn)
 	if err != nil {
-		log.Fatal("Gagal terhubung ke database:", err)
+		log.Fatal("Failed to connect to the server:", err)
 	}
 
-	// Cek koneksi ke database
 	if err := DB.Ping(); err != nil {
-		log.Fatal("Tidak dapat menjangkau database:", err)
+		log.Fatal("Databased cannot be reached:", err)
 	}
 
-	fmt.Println("Berhasil terhubung ke database")
+	fmt.Println("Successfully connected to the database")
 }

@@ -14,13 +14,14 @@ import (
 
 // Initialize JWT Key
 var jwtKey []byte
+
 func init() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
-	jwtKey = []byte(os.Getenv("JWT_SECRET")) 
+	jwtKey = []byte(os.Getenv("JWT_SECRET"))
 }
 
 // Define a custom type for context keys
